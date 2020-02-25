@@ -28,6 +28,8 @@ class DTM {
   void estimate(size_t num_iters);
   void save_data(string dir);
   void diagnosis(size_t t);
+  void diagnosis();
+  void test(const vector<vector<vector<size_t>>> &Wtetst);
   void build_alias_table(size_t t, size_t w);
 
  private:

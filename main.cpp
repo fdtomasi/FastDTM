@@ -16,7 +16,7 @@ int conf_error() {
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 11) {
+  if (argc < 11) {
     cerr << "Usage: " << argv[0]
          << " <dtm.config path> <num_topics> <SGLD_a> <SGLD_b> <SGLD_c> "
          << "<phi_var> <eta_var> <alpha_var> <num_iter> <results_folder>"
@@ -26,6 +26,8 @@ int main(int argc, char* argv[]) {
   string line;
   ifstream conf_file(argv[1]);
   vector<string> conf;
+  ifstream conf_file_test(argv[11]);
+  vector<string> conf_test;
 
   if (!conf_file.is_open()) {
     cout << "Couldn't find dtm.conf" << endl;
@@ -33,6 +35,9 @@ int main(int argc, char* argv[]) {
   }
   while(getline(conf_file, line)) {
     conf.push_back(line);
+  }
+  while(getline(conf_file_test, line)) {
+    conf_test.push_back(line);
   }
 
   vector<string> vocabulary;
@@ -62,6 +67,25 @@ int main(int argc, char* argv[]) {
     cout << "Time Slice t = " << t << " Num docs: " << docs_t.size() << endl;
     docs[t] = docs_t;
   }
+  vector<vector<vector<size_t>>> docs_test(conf_test.size());
+  for (size_t t = 0; t < docs_test.size(); ++t) {
+    ifstream docfile(conf_test[t]);
+    if (!docfile.is_open()) {
+      return conf_error();
+    }
+    vector<vector<size_t>> docs_test_t;
+    while(getline(docfile, line)) {
+      vector<size_t> doc;
+      istringstream is(line);
+      size_t term;
+      while (is >> term) {
+        doc.push_back(term);
+      }
+      docs_test_t.push_back(doc);
+    }
+    cout << "Time Slice t = " << t << " Num docs_test: " << docs_test_t.size() << endl;
+    docs_test[t] = docs_test_t;
+  }
   size_t num_topics = atoi(argv[2]);
   float sgld_a = atof(argv[3]);
   float sgld_b = atof(argv[4]);
@@ -74,7 +98,10 @@ int main(int argc, char* argv[]) {
   DTM dtm(docs, vocabulary, num_topics, sgld_a, sgld_b, sgld_c, phi_var,
           eta_var, alpha_var);
   dtm.initialize(true);
+  cout << "Test perplexity: " << endl;
+  dtm.test(docs_test);
   dtm.estimate(num_iters);
+  dtm.test(docs_test);
   dtm.save_data(argv[10]);
   return 0;
 }

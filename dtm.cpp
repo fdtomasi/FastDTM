@@ -254,38 +254,81 @@ void DTM::estimate(size_t num_iters) {
       cov *= sigma;
       mean = (alpha_bar / alpha_precision + (eta_bar / dtm_eta_var)) * sigma;
       alpha.row(t) = get_mvn_samples(mean, cov);
-      if (iter % 5 == 0) {
-        diagnosis(t);
-      }
+    }
+    if (iter % 5 == 0) {
+      diagnosis();
     }
   }
 }
 
-void DTM::diagnosis(size_t t) {
-  float perp = 0.0;
-  unsigned N = 0;
-  float total_log_likelihood = 0.0;
-  vector<VectorXf> softmax_phi(K);
-  vector<VectorXf> softmax_eta(D[t]);
-  for (size_t k = 0; k < K; ++k) {
-    softmax_phi[k] = softmax(phi[t].col(k));
-  }
-  for (size_t d = 0; d < D[t]; d++) {
-    N += W[t][d].size();
-    softmax_eta[d] = softmax(eta[t].row(d));
-    for (size_t n = 0; n < W[t][d].size(); n++) {
-      float likelihood = 0.0;
-      size_t w = W[t][d][n];
-      for (size_t k = 0; k < K; k++) {
-        likelihood += ((softmax_eta[d](k) * (softmax_phi[k](w))));
-        if (likelihood < 0)
-          std::cout << "Likelihood less than 0, error" << std::endl;
-      }
-      total_log_likelihood += log(likelihood);
+void DTM::diagnosis() {
+  float perplexity = 0.0;
+  for (size_t t = 0; t < T; t++) {
+    float perp = 0.0;
+    unsigned N = 0;
+    float total_log_likelihood = 0.0;
+    vector<VectorXf> softmax_phi(K);
+    vector<VectorXf> softmax_eta(D[t]);
+    for (size_t k = 0; k < K; ++k) {
+      softmax_phi[k] = softmax(phi[t].col(k));
     }
+    for (size_t d = 0; d < D[t]; d++) {
+      N += W[t][d].size();
+      softmax_eta[d] = softmax(eta[t].row(d));
+      for (size_t n = 0; n < W[t][d].size(); n++) {
+        float likelihood = 0.0;
+        size_t w = W[t][d][n];
+        for (size_t k = 0; k < K; k++) {
+          likelihood += ((softmax_eta[d](k) * (softmax_phi[k](w))));
+          if (likelihood < 0)
+            std::cout << "Likelihood less than 0, error" << std::endl;
+        }
+        total_log_likelihood += log(likelihood);
+      }
+    }
+    perplexity += -total_log_likelihood / N;
   }
-  cout << "Perplexity: " <<  t << "  "
-       << exp(-total_log_likelihood / N) << endl;
+  perplexity /= T;
+  cout << "Perplexity: "
+       << exp(perplexity) << endl;
+}
+
+void DTM::test(const vector<vector<vector<size_t>>> &Wtest) {
+  size_t Ttest = Wtest.size();
+  float perplexity = 0.0;
+  for (size_t t = 0; t < Ttest; t++) {
+    float perp = 0.0;
+    unsigned N = 0;
+    float total_log_likelihood = 0.0;
+    vector<VectorXf> softmax_phi(K);
+    vector<VectorXf> softmax_eta(D[t]);
+    for (size_t k = 0; k < K; ++k) {
+      softmax_phi[k] = softmax(phi[t].col(k));
+    }
+    if (t < Wtest.size()) {
+      for (size_t d = 0; d < Wtest[t].size(); d++) {
+      if (t == 3 && d> 437) continue;
+        N += Wtest[t][d].size();
+        softmax_eta[d] = softmax(eta[t].row(d));
+        for (size_t n = 0; n < Wtest[t][d].size(); n++) {
+          float likelihood = 0.0;
+          size_t w = Wtest[t][d][n];
+          for (size_t k = 0; k < K; k++) {
+            if (w >= softmax_phi[k].size() || k >= softmax_eta[d].size()) continue;
+            likelihood += ((softmax_eta[d](k) * (softmax_phi[k](w))));
+            if (likelihood < 0)
+              std::cout << "Likelihood less than 0, error" << std::endl;
+          }
+          total_log_likelihood += log(likelihood);
+        }
+      }
+    }
+    perplexity += -total_log_likelihood / N;
+  }
+
+  perplexity /= Ttest;
+  cout << "Perplexity: "
+       << exp(perplexity) << endl;
 }
 
 void DTM::save_data(string dir) {
